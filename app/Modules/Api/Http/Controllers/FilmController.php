@@ -1,25 +1,60 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Modules\Api\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Session;
-use App\Films;
+use App\Modules\Api\Models\Film;
 use App\Genre;
 use App\Comment;
 use App\User;
 
-class FilmController extends Controller
+class FilmController extends ApiController
 {
     /**
      * Display a listing of the resource.
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request  $request)
     {
-        $film_list = Films::paginate(1);
-        return view('backend/films.index')->withlist($film_list);
+        $draw = $request->input('draw');
+        $start = $request->input('start');
+        $length = $request->input('length');
+        $page = (int)$start > 0 ? ($start / $length) + 1 : 1;
+        $limit = (int)$length > 0 ? $length : 1;
+        $columnIndex = $request->input('order')[0]['column']; // Column index
+        $columnName = $request->input('columns')[$columnIndex]['data']; // Column name
+        $columnSortOrder = $request->input('order')[0]['dir']; // asc or desc value
+        $searchValue = $request->input('search')['value']; // Search value from datatable
+
+        $countAll = Film::count();
+        $paginate = Film::paginate($limit, ["*"], 'page', $page);
+
+        //$paginate = Film::get()->all();
+        $num = 1;
+        $items = array();
+        foreach ($paginate->items() as $idx => $row) {
+            $items[] = array(
+                "name" => $row['name'],
+                "description" => $row['description'],
+                "release_date" => $row['release_date'],
+                "rating" => $row['rating'],
+                "ticket_price" => $row['ticket_price'],
+                "country" => $row['country'],
+            );
+            $num++;
+        }
+
+        $response = array(
+            "draw" => (int)$draw,
+            "recordsTotal" => (int)$countAll,
+            "recordsFiltered" => (int)$paginate->total(),
+            "data" => $items
+        );
+        return response()->json($response);
+
+       // return response()->json(['status' => 'success', 'data'=> $data ], 200);
     }
 
     /**
@@ -27,8 +62,7 @@ class FilmController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function create()
-    {
+    public function create(){
         $genre_list = Genre::all();
         return view('backend/films.create')->withgenre($genre_list);
     }
@@ -39,8 +73,7 @@ class FilmController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
-    {
+    public function store(Request $request){
         $this->validate($request, [
             'name' => 'required',
             'description' => 'required',
@@ -69,8 +102,7 @@ class FilmController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function show($id)
-    {
+    public function show($id){
         $film = Films::findOrFail($id);
         //$film_id = $id;
         $comment_list = Comment::all();
@@ -119,7 +151,6 @@ class FilmController extends Controller
 
         $input = $request->all();
         $input['photo'] = $getimageName;
-        //Films::create($input);
 
         $films->fill($input)->save();
 
